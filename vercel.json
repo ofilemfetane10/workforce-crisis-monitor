@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/sync/workforce",
+      "schedule": "0 4 * * 1"
+    }
+  ]
+}

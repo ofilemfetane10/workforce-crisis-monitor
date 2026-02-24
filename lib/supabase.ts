@@ -1,17 +1,14 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js'
 
-export function supabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// ─── Browser client (uses anon key — safe to expose) ───────────────────────
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-  if (!url) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-  if (!serviceKey) {
-    throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-  }
-
-  return createClient(url, serviceKey, {
-    auth: { persistSession: false },
-  });
-}
+// ─── Server client (uses service role key — server-side only) ───────────────
+export const supabaseAdmin = () =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )

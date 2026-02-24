@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  // Optional auth
+  // Optional auth (only if you set CRON_SECRET in Vercel)
   const secret = process.env.CRON_SECRET;
   if (secret) {
     const auth = req.headers.get("authorization");
@@ -14,16 +14,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Import inside handler so build won't crash if env is missing
     const { fetchWorkforceData, scoreWorkforceData } = await import("@/lib/eurostat");
-    const { supabaseAdmin } = await import("@/lib/supabase");
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // If env missing, don’t crash build/deploy — just skip DB saving
+    // Always compute data
+    const raw = await fetchWorkforceData();
+    const scored = scoreWorkforceData(raw);
+
+    // If Supabase isn't configured, return computed data without saving
     if (!supabaseUrl || !serviceKey) {
-      const raw = await fetchWorkforceData();
-      const scored = scoreWorkforceData(raw);
       return NextResponse.json({
         success: true,
         saved: false,
@@ -33,13 +35,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const raw = await fetchWorkforceData();
-    const scored = scoreWorkforceData(raw);
-
-    if (!scored.length) {
-      return NextResponse.json({ error: "No data returned from Eurostat" }, { status: 502 });
-    }
-
+    // Only import supabaseAdmin if we're actually going to use it
+    const { supabaseAdmin } = await import("@/lib/supabase");
     const db = supabaseAdmin();
 
     const rows = scored.map((c: any) => ({
@@ -70,10 +67,14 @@ export async function POST(req: NextRequest) {
       syncedAt: new Date().toISOString(),
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? "Sync failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? "Sync failed" },
+      { status: 500 }
+    );
   }
 }
 
+// Allow GET for easy manual testing
 export async function GET(req: NextRequest) {
   return POST(req);
 }
